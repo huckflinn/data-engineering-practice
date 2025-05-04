@@ -7,5 +7,5 @@ services:
   run:
     image: "exercise-2"
     volumes:
-      - .:/app
-    command: python3 main.py
+      - .:/app/
+    command: python3 src/main.py
