@@ -1,8 +1,13 @@
 import boto3
 import logging
 import gzip
+from io import BytesIO
 import os
-from botocore.exceptions import ClientError, NoCredentialsError
+from botocore.exceptions import (
+    ClientError,
+    NoCredentialsError,
+    ParamValidationError,
+)
 
 logging.basicConfig(
     format="{asctime} | {levelname} | {message}",
@@ -11,37 +16,41 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-def get_archive(bucket, object, filename):  
+def get_archive(bucket, object):  
     s3 = boto3.client("s3")
 
     try:
-        logging.info("Downloading file from S3...")
-
-        s3.download_file(bucket, object, filename)
+        logging.info("Retrieving file from S3...")
+        res = s3.get_object(Bucket = bucket, Key = object)
+        return res
     
     except ClientError as e:
         logging.error(f"ClientError: {e}")
     except NoCredentialsError as e:
         logging.error(f"NoCredentialsError: {e}")
+    except ParamValidationError as e:
+        logging.error(f"ParamValidationError: {e}")
     except Exception as e:
-        logging.error(f"An unexpected error occurred: {e}")
+        logging.error(f"An unexpected error occurred: {e.__class__.__name__}")
+        logging.error(e)
 
 
-def extract_uri(filename):
-    logging.info(f"Extracting URI from {filename}...")
+def extract_uri(res):
+    logging.info(f"Extracting URI from Response object...")
     try:
-        with gzip.open(filename) as f:
-            uri = f.readline()
-            # return uri.decode("utf-8").split("/")[-1]
-            return uri.decode("utf-8")[:-1]
+        with gzip.open(res["Body"]) as z:
+            return z.readline().decode("utf-8")
+
         
     except gzip.BadGzipFile as e:
-        logging.error("Invalid gzip file.")
-        logging.error(e)
+        logging.error(f"BadGzipFile: {e}")
     except FileNotFoundError as e:
-        logging.error(f"File not found: {e}")
+        logging.error(f"FileNotFound: {e}")
+    except TypeError as e:
+        logging.error(f"TypeError: {e}")
     except Exception as e:
-        logging.error(f"An unexpected error occurred: {e}")
+        logging.error(f"An unexpected error occurred: {e.__class__.__name__}")
+        logging.error(e)
 
 
 def display_cc_content(filename):
@@ -52,50 +61,38 @@ def display_cc_content(filename):
                 print(line, end = '')
 
     except gzip.BadGzipFile as e:
-        logging.error("Invalid gzip file.")
-        logging.error(e)
+        logging.error(f"BadGzipFile: {e}")
     except FileNotFoundError as e:
-        logging.error(f"File not found: {e}")
+        logging.error(f"FileNotFound: {e}")
     except Exception as e:
-        logging.error(f"An unexpected error occurred: {e}")    
+        logging.error(f"An unexpected error occurred: {e.__class__.__name__}")
+        logging.error(e)
 
 
 def main():
     bucket = "commoncrawl"
     object = "crawl-data/CC-MAIN-2022-05/wet.paths.gz"
-    filename = "s3_download.gz"
 
     try:
-        get_archive(bucket, object, filename)
+        res = get_archive(bucket, object)
+        print("Successfully streamed!")
 
     except Exception as e:
-        logging.error(f"Pipeline failed due to an unexpected error: {e}")
+        logging.error(f"Pipeline failed due to an unexpected error: {e.__class__.__name__}")
         raise
 
-    uri = extract_uri(filename)
+    uri = extract_uri(res)
+    print(uri)
+    print("We did it!")
 
     try:
-        os.remove(filename)
-    except FileNotFoundError as e:
-        logging.error(f"FileNotFound error: {e}")
-    except Exception as e:
-        logging.error(f"An unexpected error occurred: {e}")
-
-    try:
-        get_archive(bucket, uri, filename)
+        res = get_archive(bucket, uri)
 
     except Exception as e:
-        logging.error(f"Pipeline failed due to an unexpected exception: {e}")
+        logging.error(f"Pipeline failed due to an unexpected exception: {e.__class__.__name__}")
         raise
 
-    display_cc_content(filename)
-
-    try:
-        os.remove(filename)
-    except FileNotFoundError as e:
-        logging.error(f"FileNotFound error: {e}")
-    except Exception as e:
-        logging.error(f"An unexpected error occurred: {e}")
+    # display_cc_content(filename)
 
 
 if __name__ == "__main__":
