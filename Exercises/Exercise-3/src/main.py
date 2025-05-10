@@ -2,7 +2,7 @@ import boto3
 import logging
 import gzip
 import os
-from botocore.exceptions import ClientError
+from botocore.exceptions import ClientError, NoCredentialsError
 
 logging.basicConfig(
     format="{asctime} | {levelname} | {message}",
@@ -20,9 +20,11 @@ def get_archive(bucket, object, filename):
         s3.download_file(bucket, object, filename)
     
     except ClientError as e:
-        logging.errorr(f"An exception occurred: {e}")
+        logging.error(f"ClientError: {e}")
+    except NoCredentialsError as e:
+        logging.error(f"NoCredentialsError: {e}")
     except Exception as e:
-        logging.error(f"An unexpected exception occurred: {e}")
+        logging.error(f"An unexpected error occurred: {e}")
 
 
 def extract_uri(filename):
@@ -30,27 +32,32 @@ def extract_uri(filename):
     try:
         with gzip.open(filename) as f:
             uri = f.readline()
-            return uri.decode("utf-8").split("/")[-1]
+            # return uri.decode("utf-8").split("/")[-1]
+            return uri.decode("utf-8")[:-1]
         
     except gzip.BadGzipFile as e:
         logging.error("Invalid gzip file.")
         logging.error(e)
+    except FileNotFoundError as e:
+        logging.error(f"File not found: {e}")
     except Exception as e:
-        logging.error(f"An unexpected exception occurred: {e}")
+        logging.error(f"An unexpected error occurred: {e}")
 
 
 def display_cc_content(filename):
     logging.info("Printing Common Crawl contents...")
     try:
-        with gzip.open(fiename) as f:
+        with gzip.open(filename) as f:
             for line in f:
                 print(line, end = '')
 
     except gzip.BadGzipFile as e:
         logging.error("Invalid gzip file.")
         logging.error(e)
+    except FileNotFoundError as e:
+        logging.error(f"File not found: {e}")
     except Exception as e:
-        logging.error(f"An unexpected exception occurred: {e}")    
+        logging.error(f"An unexpected error occurred: {e}")    
 
 
 def main():
@@ -62,12 +69,17 @@ def main():
         get_archive(bucket, object, filename)
 
     except Exception as e:
-        logging.error(f"Pipeline failed due to an unexpected exception: {e}")
+        logging.error(f"Pipeline failed due to an unexpected error: {e}")
         raise
 
     uri = extract_uri(filename)
 
-    os.remove(filename)
+    try:
+        os.remove(filename)
+    except FileNotFoundError as e:
+        logging.error(f"FileNotFound error: {e}")
+    except Exception as e:
+        logging.error(f"An unexpected error occurred: {e}")
 
     try:
         get_archive(bucket, uri, filename)
@@ -78,7 +90,12 @@ def main():
 
     display_cc_content(filename)
 
-    os.remove(filename)
+    try:
+        os.remove(filename)
+    except FileNotFoundError as e:
+        logging.error(f"FileNotFound error: {e}")
+    except Exception as e:
+        logging.error(f"An unexpected error occurred: {e}")
 
 
 if __name__ == "__main__":
