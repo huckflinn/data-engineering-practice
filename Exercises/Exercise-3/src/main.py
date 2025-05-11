@@ -51,19 +51,17 @@ def extract_uri(res):
         logging.error(e)
 
 
-def display_cc_content(res, numlines):
+def display_cc_content(res):
     logging.info("Printing Common Crawl contents...")
-    if numlines <= 0:
-        print("Please enter 1 or more lines to print.")
-        return
     
     try:
         with gzip.open(res["Body"]) as z:
+            line_limit = 30
             for line in z:
-                if numlines == 0:
+                if line_limit == 0:
                     break
                 print(line.decode("utf-8")[:-1])
-                numlines -= 1
+                line_limit -= 1
 
     except Exception as e:
         logging.error(f"An unexpected error occurred: {e.__class__.__name__}")
@@ -85,7 +83,7 @@ def main():
 
     try:
         res = get_archive(bucket, uri)
-        display_cc_content(res, 30)
+        display_cc_content(res)
 
     except Exception as e:
         logging.error(f"Pipeline failed due to an unexpected exception: {e.__class__.__name__}")
