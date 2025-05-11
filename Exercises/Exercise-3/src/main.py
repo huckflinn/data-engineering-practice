@@ -1,8 +1,6 @@
 import boto3
 import logging
 import gzip
-from io import BytesIO
-import os
 from botocore.exceptions import (
     ClientError,
     NoCredentialsError,
@@ -39,7 +37,7 @@ def extract_uri(res):
     logging.info(f"Extracting URI from Response object...")
     try:
         with gzip.open(res["Body"]) as z:
-            return z.readline().decode("utf-8")
+            return z.readline().decode("utf-8")[:-1]
 
         
     except gzip.BadGzipFile as e:
@@ -53,17 +51,20 @@ def extract_uri(res):
         logging.error(e)
 
 
-def display_cc_content(filename):
+def display_cc_content(res, numlines):
     logging.info("Printing Common Crawl contents...")
+    if numlines <= 0:
+        print("Please enter 1 or more lines to print.")
+        return
+    
     try:
-        with gzip.open(filename) as f:
-            for line in f:
-                print(line, end = '')
+        with gzip.open(res["Body"]) as z:
+            for line in z:
+                if numlines == 0:
+                    break
+                print(line.decode("utf-8")[:-1])
+                numlines -= 1
 
-    except gzip.BadGzipFile as e:
-        logging.error(f"BadGzipFile: {e}")
-    except FileNotFoundError as e:
-        logging.error(f"FileNotFound: {e}")
     except Exception as e:
         logging.error(f"An unexpected error occurred: {e.__class__.__name__}")
         logging.error(e)
@@ -75,24 +76,20 @@ def main():
 
     try:
         res = get_archive(bucket, object)
-        print("Successfully streamed!")
 
     except Exception as e:
         logging.error(f"Pipeline failed due to an unexpected error: {e.__class__.__name__}")
         raise
 
     uri = extract_uri(res)
-    print(uri)
-    print("We did it!")
 
     try:
         res = get_archive(bucket, uri)
+        display_cc_content(res, 30)
 
     except Exception as e:
         logging.error(f"Pipeline failed due to an unexpected exception: {e.__class__.__name__}")
         raise
-
-    # display_cc_content(filename)
 
 
 if __name__ == "__main__":
