@@ -118,7 +118,21 @@ def main():
     database = "postgres"
     user = "postgres"
     pas = "postgres"
-    conn = psycopg2.connect(host=host, database=database, user=user, password=pas)
+    
+    try:
+        conn = psycopg2.connect(host=host, database=database, user=user, password=pas)
+
+        create_tables(conn)
+        ingest_data(conn)
+
+    except psycopg2.Error as e:
+        logging.error(f"Data pipeline failed with the following error: {e}")
+        raise
+
+    finally:
+        if "conn" in locals():
+            conn.close()
+            logging.info("Database connection closed.")
 
 
 
