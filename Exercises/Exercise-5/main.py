@@ -67,7 +67,51 @@ def create_tables(conn):
         logging.error(f"Error creating tables: {e}")
         cur.rollback()
         raise
-    
+
+
+def ingest_data(conn):
+    try:
+        with conn.cursor as cur:
+            
+            logging.info("Ingesting accounts data.")
+            with open("data/accounts.csv") as f:
+                f.next() # Skip header
+                cur.copy_expert(
+                    "COPY accounts FROM STDIN WITH (FORMAT csv, NULL '')",
+                    f
+                )
+
+            logging.info("Ingesting products data.")
+            with open("data/products.csv") as f:
+                f.next()
+                cur.copy_expert(
+                    "COPY products FROM STDIN WITH (FORMAT csv, NULL '')",
+                    f
+                )
+
+            logging.info("Ingesting transactions data.")
+            with open("data/transactions.csv") as f:
+                f.next()
+                cur.copy_expert(
+                    "COPY transactions FROM STDIN WITH (FORMAT csv, NULL '')",
+                    f
+                )
+
+            conn.commit()
+            logging.info("Successfully ingested CSV data.")
+
+            for table in ["accounts", "products", "transactions"]:
+                cur.execute(psycopg2.sql.SQL("SELECT COUNT(*) FROM {}").format(psycopg2.sql.Identifier(table)))
+                count = cur.fetchone()[0]
+                logging.info(f"Loaded {count} rows into {table}.")
+
+
+    except psycopg2.Error as e:
+        logging.error(f"Error ingesting data: {e}")
+        cur.rollback()
+        raise
+
+
 
 def main():
     host = "postgres"
